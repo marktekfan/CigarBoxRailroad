@@ -194,7 +194,10 @@ void setup()
 
   // Prescaler on timer4 is set to 64 (488Hz PWM) by Arduino core.
   // Change prescaler from 64 into 4 (7812Hz PWM)
+  // TCCR4B &= ~_BV(CS42);
+  // Change prescaler from 64 into 2 (15625Hz PWM)
   TCCR4B &= ~_BV(CS42);
+  TCCR4B &= ~_BV(CS40);
 
   // start serial port
   Serial.begin(9600);
@@ -226,7 +229,7 @@ void read_speedknob_value()
 void control_motor_speed()
 {
   int channel = (active_motor == 1) ? MOTOR_SENSE_1 : MOTOR_SENSE_2;
-  motor_sense = (motor_sense + (analogRead(channel) >> 2)) >> 1;
+  motor_sense = (motor_sense + ((analogRead(channel) + 3) >> 2) + 1) >> 1; // Round-up before shifting
 
   // Control the motor by voltage (not current!) as measured over motor.
   // This will accurately compensate for back EMF.
@@ -295,6 +298,16 @@ void show_status()
       return;
   }
 
+  // // Slow blink when idle
+  // if (motor_speed == 0 && speedknob_value == 0)
+  // {
+  //   if ((msTimerFree & 0x300) == 0)
+  //   {
+  //     if ((msTimerFree & 0x3) != 0)
+  //       return;
+  //   }
+  // }
+
   if (active_motor == 1)
   {
     digitalWrite(LED_TRACK1, LED_ON);
@@ -349,6 +362,10 @@ void update_speed()
       motor_speed--;
       msTimerRamp -= accel_down;
     }
+  }
+  else
+  {
+    msTimerRamp = 0;
   }
 }
 
@@ -427,6 +444,8 @@ void handle_mode_automatic()
     stop_motor_and_wait_for_buttons();
   }
 
+  random(); // Make truly random
+
   switch (state)
   {
   case STATE_STOPPING:
@@ -442,7 +461,7 @@ void handle_mode_automatic()
     // when driving too fast, break hard
     if (motor_speed > 140)
     {
-      accel_down = 1;
+      accel_down = 2;
     }
     break;
 
@@ -450,8 +469,8 @@ void handle_mode_automatic()
     target_speed = 0;
     if (msTimerStop > stop_time)
     {
-      accel_up = 13;
-      accel_down = 5;
+      accel_up = 16;
+      accel_down = 7;
 
       rounds_to_go = 2;
       uint8_t rnd = random(100);
@@ -472,8 +491,12 @@ void handle_mode_automatic()
   {
     target_speed = min(speedknob_value, max_speed);
 
-    // Limit driving speed after some seconds
-    uint16_t distance = (13000 - target_speed * 35);
+    //
+    //
+    // Limit driving speed after fixed distance/seconds
+    uint16_t distance = (14000 - target_speed * 32);
+    if (active_motor == 1)
+      distance -= 1000; // Adjust for: Motor 1 is slightly faster
 
     if (msTimerDrive >= distance)
     {
@@ -481,6 +504,7 @@ void handle_mode_automatic()
       int16_t target = 140;
       if (rounds_to_go == 1 || exit_automatic) // Last round
         target = 120;
+
       if (target_speed > target)
       {
         target_speed = target;
@@ -512,8 +536,8 @@ void handle_mode_automatic()
       }
 
       // Start next round
-      // Aready driving, so give timer a headstart of 1000mS
-      msTimerDrive = 1000;
+      // Aready driving, so give timer a headstart of 1500mS
+      msTimerDrive = 1500;
     }
     break;
   }
@@ -522,15 +546,15 @@ void handle_mode_automatic()
 void loop()
 {
   updateTimers();
+  show_status();
 
-  if (msTimerTask >= 10)
+  if (msTimerTask >= 2)
   {
-    msTimerTask -= 10;
+    msTimerTask -= 2;
     control_motor_speed(); // Can be outside msTimerTask
 
     read_speedknob_value();
     read_buttons();
-    show_status();
     update_speed();
 
     switch (operation_mode)
@@ -556,10 +580,14 @@ void loop()
     if (_serialAvailable)
     {
       //     // Serial.print("KNOB_SPEED: ");    Serial.println(analogRead(KNOB_SPEED));
-      //     // Serial.print("MOTOR_SENSE_1: "); Serial.println(analogRead(MOTOR_SENSE_1));
-      //     // Serial.print("MOTOR_SENSE_2: "); Serial.println(analogRead(MOTOR_SENSE_2));
-      //     // Serial.print("pwm: ");
-      //     // Serial.println(motor_speed_pwm);
+      Serial.print("MOTOR_SENSE_1: ");
+      Serial.println(analogRead(MOTOR_SENSE_1));
+      Serial.print("MOTOR_SENSE_2: ");
+      Serial.println(analogRead(MOTOR_SENSE_2));
+      Serial.print("pwm: ");
+      Serial.println(motor_speed_pwm);
+      Serial.print("motor_speed: ");
+      Serial.println(motor_speed);
       //     Serial.print("TRACK_SENSE_1: ");
       //     Serial.println(analogRead(TRACK_SENSE_1));
       //     Serial.print("TRACK_SENSE_2: ");
