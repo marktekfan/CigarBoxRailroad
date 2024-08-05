@@ -4,7 +4,7 @@ CBRR - Firmware to control a Railroad inside a Cigar Box.
 Size of the Cigar Box is 17.7x13 cm (7x5.1 inch)
 
 # Firmware
-Originally the firmware was written in BASCOM-AVR for a AT90S4433.   
+Originally the firmware was written around 2000 in BASCOM-AVR for a AT90S4433.   
 The firmware has been rewritten for Arduino and will likely run on any Arduino with at least 13 I/O pins.
 
 ## Functionality
